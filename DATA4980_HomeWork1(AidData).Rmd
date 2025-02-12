@@ -1,0 +1,325 @@
+# Aid Data
+# Question: Is there an increase or decrease in the aid spending by the countries over the years?
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+```{r Importing important libraries}
+# Load required libraries
+library(ggplot2)
+library(dplyr)
+```
+
+```{r}
+# Load the dataset
+aiddata <- read.csv("C:/Users/skadav/Downloads/AidDataCoreDonorRecipientYearPurpose_ResearchRelease_Level1_v3.0.csv")
+```
+
+```{r}
+# Summarize total aid spending by year
+aid_year <- aiddata %>%
+  group_by(year) %>%
+  summarise(total_aid = sum(commitment_amount_usd_constant_sum, na.rm = TRUE))
+
+# Summarize total aid spending by donor country and year
+aid_country_year <- aiddata %>%
+  group_by(donor, year) %>%
+  summarise(total_aid = sum(commitment_amount_usd_constant_sum, na.rm = TRUE))
+```
+
+```{r}
+table(aid_year$year)
+```
+
+```{r}
+aid_year <- aid_year %>% 
+  filter(year != 9999) %>% 
+  mutate(total_aid_billion = total_aid / 1e9)
+
+aid_country_year <- aid_country_year %>% 
+  filter(year != 9999) %>% 
+  mutate(total_aid_billion = total_aid / 1e9)
+```
+
+```{r}
+# Plot line chart with better scaling
+ggplot(aid_year, aes(x = year, y = total_aid_billion)) +
+  geom_line(color = "blue", size = 1) +
+  geom_point(color = "red") +
+  labs(title = "Total Aid Spending Over Time",
+       x = "Year",
+       y = "Total Aid (in Billions USD)",
+       caption = "Source: AidData") +
+  scale_x_continuous(breaks = seq(min(aid_year$year), max(aid_year$year), 4)) +
+  scale_y_continuous(labels = scales::label_number()) +  # Auto-scale using SI notation (e.g., B for billions)
+  theme_minimal()
+```
+
+```{r}
+# Boxplot for aid spending distribution per year
+ggplot(aid_year, aes(x = as.factor(year), y = total_aid_billion)) +
+  geom_boxplot(outlier.color = "red", outlier.shape = 16) +
+  scale_y_log10() +  # Log scale to handle large variations
+  scale_y_continuous(labels = scales::label_number()) +
+  scale_x_discrete(breaks = seq(0, 2015, 4)) +
+  labs(title = "Distribution of Aid Spending Over Years",
+       x = "Year",
+       y = "Aid Amount (log scale)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+
+```{r}
+ggplot(aid_year, aes(x = as.factor(year), y = total_aid_billion, fill = total_aid)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  scale_fill_gradient(low = "lightblue", high = "darkblue") +
+  scale_y_continuous(labels = scales::label_number()) +
+  scale_x_discrete(breaks = seq(0, 2015, 4)) +
+  labs(title = "Total Aid Spending Per Year",
+       x = "Year",
+       y = "Total Aid (in Billions USD)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+```{r}
+table(aid_country_year$donor)
+
+# Define a list of country names (ISO or manually curated)
+country_donors <- c("Australia", "Austria", "Belgium", "Brazil", "Canada", "Chile", "Colombia",
+                    "Cyprus", "Czech Republic", "Denmark", "Estonia", "Finland", "France", "Germany",
+                    "Greece", "Hungary", "Iceland", "India", "Ireland", "Italy", "Japan", "Korea",
+                    "Kuwait", "Latvia", "Liechtenstein", "Lithuania", "Luxembourg", "Monaco",
+                    "Netherlands", "New Zealand", "Norway", "Poland", "Portugal", "Qatar", "Romania",
+                    "Saudi Arabia", "Slovak Republic", "Slovenia", "South Africa", "Spain", "Sweden",
+                    "Switzerland", "Taiwan", "Thailand", "United Arab Emirates", "United Kingdom",
+                    "United States")
+
+# Filter dataset to keep only country donors
+aid_country_year_filtered <- aid_country_year %>%
+  filter(donor %in% country_donors)
+
+# Check the first few rows
+head(aid_country_year_filtered)
+
+```
+
+```{r}
+library(viridis)
+
+ggplot(aid_country_year_filtered, aes(x = year, y = reorder(donor, -total_aid_billion), fill = total_aid_billion)) +
+  geom_tile() +
+  scale_fill_viridis(option = "C", trans = "log", breaks = scales::log_breaks(n = 5), labels = scales::label_number()) +
+  labs(title = "Aid Distribution Across Donor Countries and Years",
+       x = "Year",
+       y = "Donor Country",
+       fill = "Total Aid (log scale)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+
+```{r}
+top_donors <- aid_country_year_filtered %>%
+  group_by(donor) %>%
+  summarise(total_aid = sum(total_aid, na.rm = TRUE)) %>%
+  arrange(desc(total_aid)) %>%
+  slice(1:5) %>%
+  mutate(total_aid_billion = total_aid / 1e9) %>% 
+  pull(donor)
+
+# Filter data for only the top donors
+df_top_donors <- aid_country_year %>%
+  filter(donor %in% top_donors)
+```
+
+
+```{r}
+ggplot(df_top_donors, aes(x = year, y = total_aid_billion, fill = donor)) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_fill_brewer(palette = "Set2") +
+  scale_y_continuous(labels = scales::label_number()) +
+  labs(title = "Top 5 Donors' Contribution Over Time",
+       x = "Year",
+       y = "Total Aid (in Billions USD)",
+       fill = "Donor") +
+  theme_minimal() +
+  theme(legend.position = "bottom")  # Move legend to the bottom
+```
+
+
+```{r}
+ggplot(aid_country_year_filtered, aes(x = year, y = total_aid_billion, color = donor)) +
+  geom_line(size = 1) +
+  geom_point() +
+  facet_wrap(~ donor, scales = "free_y") +  # Creates a grid of plots, one per donor
+  scale_color_brewer(palette = "Set2") +
+  labs(title = "Aid Contributions Over Time (Grid of Donor Line Graphs)",
+       x = "Year",
+       y = "Total Aid (in Billions USD)") +
+  theme_minimal() +
+  theme(legend.position = "none",  # Remove redundant legend
+        strip.text = element_text(face = "bold"))  # Bold facet labels
+```
+
+```{r}
+ggplot(df_top_donors, aes(x = year, y = donor, size = total_aid_billion, fill = total_aid_billion)) +
+  geom_point(alpha = 0.7, shape = 21, color = "black") +  # Bubbles with black borders
+  scale_size(range = c(2, 15), name = "Total Aid (size)") +  # Bubble size range
+  scale_fill_viridis_c(option = "C", name = "Total Aid") +  # Color gradient
+  scale_x_continuous(breaks = seq(min(df_top_donors$year), max(df_top_donors$year), 5)) +  # Control x-axis breaks
+  labs(title = "Aid Contributions Over Time (Bubble Plot)",
+       x = "Year",
+       y = "Donor Country") +
+  theme_minimal() +
+  theme(legend.position = "right",
+        axis.text.x = element_text(angle = 90, hjust = 1))  # Rotate x-axis labels for better readability
+
+```
+
+```{r}
+ggplot(df_top_donors, aes(x = year, y = donor, fill = total_aid_billion)) +
+  geom_tile() +
+  scale_fill_viridis_c(option = "C", name = "Total Aid (Billions USD)") +
+  labs(title = "Heatmap of Aid Contributions Over Time",
+       x = "Year",
+       y = "Donor Country") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))  # Rotate x-axis labels
+
+
+
+```
+
+```{r}
+library(ggalluvial)
+
+ggplot(df_top_donors, aes(axis1 = year, axis2 = donor, y = total_aid_billion)) +
+  geom_alluvium(aes(fill = donor), width = 0.4) +
+  geom_stratum() +
+  labs(title = "Flow of Top Donors' Aid Contributions Over Time",
+       x = "Year",
+       y = "Total Aid (Billions USD)") +
+  theme_minimal()
+
+```
+
+```{r}
+library(gganimate)
+library(gifski)
+
+# Create the animated plot
+p <- ggplot(df_top_donors, aes(x = year, y = total_aid_billion, color = donor)) +
+  geom_line(size = 1) +
+  labs(title = "Aid Contributions Over Time",
+       x = "Year",
+       y = "Total Aid (Billions USD)") +
+  theme_minimal() +
+  transition_reveal(year)
+
+# # Save as GIF
+# anim_save("aid_contributions.gif", animation = p, renderer = gifski_renderer())
+
+
+library(av)
+anim_save("aid_contributions.mp4", animation = p, renderer = av_renderer())
+```
+
+```{r}
+q <- ggplot(aid_country_year_filtered, aes(x = year, y = total_aid_billion, color = donor)) +
+  geom_line(size = 1) +
+  labs(title = "Aid Contributions Over Time",
+       x = "Year",
+       y = "Total Aid (Billions USD)") +
+  theme_minimal() +
+  transition_reveal(year)
+
+# # Save as GIF
+# anim_save("aid_contributions.gif", animation = p, renderer = gifski_renderer())
+
+
+library(av)
+anim_save("aid_contributions_all_countries.mp4", animation = q, renderer = av_renderer())
+
+```
+
+```{r}
+library(treemapify)
+# Might work for individual year
+ggplot(df_top_donors, aes(area = total_aid_billion, fill = donor, label = donor)) +
+  geom_treemap() +
+  geom_treemap_text(color = "white", place = "center", grow = TRUE) +
+  scale_fill_brewer(palette = "Set3") +
+  labs(title = "Treemap of Aid Contributions by Donor") +
+  theme_minimal()
+```
+
+```{r}
+
+
+ggplot(df_top_donors, aes(x = "", y = total_aid_billion, fill = donor)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar("y") +
+  labs(title = "Proportion of Total Aid by Donor") +
+  theme_void()  # Removes unnecessary axes
+
+```
+
+```{r}
+library(sf)  # For spatial data
+library(rnaturalearth)  # World map data
+library(rnaturalearthdata)
+library(gganimate)
+library(gifski)
+
+# Load world map data
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+# Merge aid data with world map
+aid_map_data <- world %>%
+  left_join(aid_country_year_filtered, by = c("name" = "donor"))  # Ensure donor names match country names in `world`
+```
+
+```{r}
+
+p <- ggplot(aid_map_data) +
+  geom_sf(aes(fill = total_aid), color = "black") +
+  scale_fill_viridis_c(option = "C", trans = "log", na.value = "grey90") +  # Log scale for better visibility
+  labs(title = "Aid Contributions by Country in {closest_state}",
+       subtitle = "Total Aid Provided (Log Scale)",
+       fill = "Aid (USD)",
+       x = "", y = "") +
+  theme_minimal() +
+  transition_states(year, transition_length = 2, state_length = 5)  # 5 seconds per frame
+
+# **Save as GIF with 5-second frames**
+animate(p, duration = 100, fps = 0.2, width = 800, height = 600, renderer = gifski_renderer())
+anim_save("aid_contributions_map.gif", animation = last_animation(), renderer = gifski_renderer())
+
+# **Save as MP4**
+library(av)
+anim_save("aid_contributions_map.mp4", animation = last_animation(), renderer = av_renderer())
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

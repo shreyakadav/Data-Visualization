@@ -1,0 +1,127 @@
+# Spotify Data
+
+# Load the libraries
+```{r}
+library(ggplot2)
+library(dplyr)
+library(readxl)
+library(ggpubr)
+```
+
+# Load Dataset
+```{r}
+data <- read_excel("C:/Users/skadav/Downloads/spotify-2023.xlsx")
+```
+
+# Bar Chart: Top 10 Most Streamed Songs
+```{r}
+top10_songs <- data %>% arrange(desc(Streams)) %>% head(10)
+ggplot(top10_songs, aes(x = reorder(`Track Name`, Streams), y = Streams / 1e9, fill = `Track Name`)) + 
+  geom_bar(stat = "identity") + 
+  coord_flip() +
+  theme_minimal() +
+  labs(title = "Top 10 Most Streamed Songs", x = "Track Name", y = "Streams (Billions)") +
+  theme(legend.position = "none")
+```
+
+```{r}
+ggplot(top10_songs, aes(x = reorder(`Track Name`, Streams), y = Streams / 1e9)) +
+  geom_segment(aes(x = `Track Name`, xend = `Track Name`, y = 0, yend = Streams / 1e9), color = "blue", size = 1) +
+  geom_point(color = "red", size = 5) +
+  coord_flip() +
+  theme_minimal() +
+  labs(title = "Top 10 Songs: Lollipop Chart", x = "Track Name", y = "Streams (Billions)")
+```
+
+```{r}
+top5_artists <- data %>%
+  group_by(Artist) %>%
+  summarise(Total_Streams = sum(Streams, na.rm = TRUE)) %>%
+  arrange(desc(Total_Streams)) %>%
+  head(5)
+print(top5_artists)
+```
+
+```{r}
+ggplot(top5_artists, aes(x = reorder(Artist, Total_Streams), y = Total_Streams / 1e9, fill = Artist)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  theme_minimal() +
+  labs(title = "Top 5 Artists by Total Streams", x = "Artist", y = "Total Streams (Billions)") +
+  theme(legend.position = "none")
+```
+
+```{r}
+top5_artists <- data %>%
+  group_by(Artist) %>%
+  summarise(Total_Streams = sum(Streams, na.rm = TRUE)) %>%
+  arrange(desc(Total_Streams)) %>%
+  head(5) %>%
+  pull(Artist)
+
+top5_data <- data %>% filter(Artist %in% top5_artists)
+```
+
+```{r}
+ggplot(top5_data, aes(x = `Year Released`, y = Artist, size = Streams / 1e9, color = Artist)) +
+  geom_point(alpha = 0.7) +
+  theme_minimal() +
+  labs(title = "Top 5 Artists: Streams Over the Years",
+       x = "Year Released",
+       y = "Artist",
+       size = "Streams (Billions)") +
+  scale_size_continuous(range = c(3, 15))
+```
+
+
+
+# Histogram: BPM Distribution
+```{r}
+ggplot(data, aes(x = BPM)) + 
+  geom_histogram(binwidth = 10, fill = "blue", color = "black", alpha = 0.7) +
+  theme_minimal() +
+  labs(title = "Distribution of BPM", x = "BPM", y = "Count")
+```
+
+```{r}
+ggplot(data, aes(x = as.factor(`Year Released`), y = Streams / 1e9)) + 
+  geom_point(alpha = 0.6, color = "red") +
+  theme_minimal() +
+  labs(title = "Streams vs. Year Relased", x = "BPM", y = "Streams (Billions)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+ggplot(data, aes(x = as.factor(`Year Released`), y = Streams / 1e9, group = 1)) + 
+  geom_line(color = "blue", size = 1) +
+  geom_point(color = "red", size = 3, alpha = 0.7) +
+  theme_minimal() +
+  labs(title = "Trend of Streams Over the Years", 
+       x = "Year Released", 
+       y = "Streams (Billions)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+ggplot(data, aes(x = as.factor(`Year Released`), y = Streams / 1e9)) + 
+  geom_boxplot(fill = "orange", alpha = 0.7) +
+  theme_minimal() +
+  labs(title = "Streams by Year of Release", x = "Year Released", y = "Streams (Billions)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+key_dist <- data %>% filter(!is.na(Key)) %>% count(Key)
+ggplot(key_dist, aes(x = "", y = n, fill = Key)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar("y", start = 0) +
+  theme_void() +
+  labs(title = "Distribution of Musical Keys")
+```
+
+
+
+
+
+
+
